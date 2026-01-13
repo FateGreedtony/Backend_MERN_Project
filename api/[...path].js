@@ -2,27 +2,46 @@ const app = require('../server');
 const connectDB = require('../config/db');
 
 module.exports = async (req, res) => {
-    const normalizeOrigin = (value) => (value || '').trim().replace(/\/+$/, '');
+    const normalizeToken = (value) => (value || '').trim().replace(/\/+$/, '');
+    const parseOrigin = (originValue) => {
+        const raw = (originValue || '').trim();
+        if (!raw) return { raw: '', origin: '', host: '' };
+        try {
+            const url = new URL(raw);
+            return { raw, origin: url.origin, host: url.host };
+        } catch {
+            // If not a full URL, treat it as hostname (e.g. frontend.vercel.app)
+            return { raw, origin: '', host: normalizeToken(raw) };
+        }
+    };
 
-    const allowedOrigins = (process.env.CORS_ORIGIN || '')
+    const allowedRaw = (process.env.CORS_ORIGIN || '')
         .split(',')
-        .map(normalizeOrigin)
+        .map(normalizeToken)
         .filter(Boolean);
 
+    const allowed = allowedRaw.map(parseOrigin);
     const requestOriginRaw = req.headers.origin;
-    const requestOrigin = normalizeOrigin(requestOriginRaw);
+    const requestParsed = parseOrigin(requestOriginRaw);
 
-    const allowAny = allowedOrigins.length === 0 || allowedOrigins.includes('*');
-    const originAllowed = !!requestOrigin && (allowAny || allowedOrigins.includes(requestOrigin));
+    const allowAny = allowed.length === 0 || allowedRaw.includes('*');
+    const originAllowed =
+        !!requestParsed.raw &&
+        (allowAny ||
+            allowed.some((a) =>
+                (a.origin && requestParsed.origin && a.origin === requestParsed.origin) ||
+                (a.host && requestParsed.host && a.host === requestParsed.host)
+            ));
 
-    if (originAllowed) {
-        // Prefer reflecting the request origin (works with credentials and avoids '*' restrictions)
+    if (originAllowed && requestOriginRaw) {
+        // Reflect the request origin (supports cookies/credentials and avoids '*' restrictions)
         res.setHeader('Access-Control-Allow-Origin', requestOriginRaw);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
     } else if (allowAny && requestOriginRaw) {
-        // When not configured, reflect origin instead of returning '*'
+        // When not configured, reflect origin for browser requests
         res.setHeader('Access-Control-Allow-Origin', requestOriginRaw);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
     } else if (allowAny) {
         // Non-browser clients without Origin header
