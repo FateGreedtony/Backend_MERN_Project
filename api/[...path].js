@@ -2,20 +2,30 @@ const app = require('../server');
 const connectDB = require('../config/db');
 
 module.exports = async (req, res) => {
+    const normalizeOrigin = (value) => (value || '').trim().replace(/\/+$/, '');
+
     const allowedOrigins = (process.env.CORS_ORIGIN || '')
         .split(',')
-        .map((s) => s.trim())
+        .map(normalizeOrigin)
         .filter(Boolean);
 
-    const requestOrigin = req.headers.origin;
-    const originAllowed = !!requestOrigin && (allowedOrigins.length === 0 || allowedOrigins.includes(requestOrigin));
+    const requestOriginRaw = req.headers.origin;
+    const requestOrigin = normalizeOrigin(requestOriginRaw);
+
+    const allowAny = allowedOrigins.length === 0 || allowedOrigins.includes('*');
+    const originAllowed = !!requestOrigin && (allowAny || allowedOrigins.includes(requestOrigin));
 
     if (originAllowed) {
-        res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+        // Prefer reflecting the request origin (works with credentials and avoids '*' restrictions)
+        res.setHeader('Access-Control-Allow-Origin', requestOriginRaw);
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Vary', 'Origin');
-    } else if (allowedOrigins.length === 0) {
-        // fallback: allow all when CORS_ORIGIN not configured
+    } else if (allowAny && requestOriginRaw) {
+        // When not configured, reflect origin instead of returning '*'
+        res.setHeader('Access-Control-Allow-Origin', requestOriginRaw);
+        res.setHeader('Vary', 'Origin');
+    } else if (allowAny) {
+        // Non-browser clients without Origin header
         res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
