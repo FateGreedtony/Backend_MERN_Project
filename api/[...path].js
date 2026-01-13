@@ -2,7 +2,6 @@ const app = require('../server');
 const connectDB = require('../config/db');
 
 module.exports = async (req, res) => {
-    // Ensure CORS headers are present even when we fail before Express runs
     const allowedOrigins = (process.env.CORS_ORIGIN || '')
         .split(',')
         .map((s) => s.trim())
