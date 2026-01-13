@@ -1,5 +1,8 @@
 const express = require("express");
 const multer = require("multer");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const {
     getProducts,
     createProduct,
@@ -9,7 +12,10 @@ const {
 } = require("../controller/ProductController.js");
 
 // Midleware untuk upload file dengan multer
-const upload = multer({ dest: "uploads/products/" }) // Folder sementara di server
+// Vercel/serverless filesystem bersifat read-only, gunakan temp dir.
+const uploadDir = path.join(os.tmpdir(), "uploads", "products");
+fs.mkdirSync(uploadDir, { recursive: true });
+const upload = multer({ dest: uploadDir });
 
 const router = express.Router();
 
