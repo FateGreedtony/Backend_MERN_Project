@@ -21,6 +21,7 @@ exports.signIn = async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required' });
   }
 
+  
   try {
     // Cek apakah pengguna terdaftar (dengan logging)
     console.log('Searching for user with email:', email);
